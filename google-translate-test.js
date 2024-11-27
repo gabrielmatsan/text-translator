@@ -1,39 +1,38 @@
-require('dotenv').config()
-const readline = require('readline')
+require('dotenv').config();
+const Fastify = require('fastify');
 const { Translate } = require('@google-cloud/translate').v2;
 
-
+const fastify = Fastify({ logger: true });
 const translate = new Translate();
 
-async function quickStart() {
+// Rota
+fastify.post('/translate', async (request, reply) => {
+  const { text, source, target } = request.body;
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+  try {
+    // Realiza a tradução com os dados fornecidos
+    const [translation] = await translate.translate(text, {
+      from: source || undefined, // Detecta automaticamente se não informado
+      to: target,
+    });
 
+    reply.send({ text, translation });
+  } catch (err) {
+    // Trata erros e responde com status 500
+    reply.status(500).send({ error: err.message || 'Erro ao realizar a tradução' });
+  }
+});
 
-  rl.question('Digite a frase para traduzir: ', (text) => {
-    rl.question(
-      'Digite o idioma de origem (ex: en para inglês ou deixe em branco para detectar automaticamente): ',
-      (source) => {
-        rl.question('Digite o idioma de destino (ex: ru para russo): ', async (target) => {
-          try {
-            const [translation] = await translate.translate(text, {
-              from: source || undefined, // Detecta automaticamente se vazio
-              to: target,
-            });
-            console.log(`Texto original: ${text}`);
-            console.log(`Tradução: ${translation}`);
-          } catch (err) {
-            console.error('Erro durante a tradução:', err.message || err);
-          } finally {
-            rl.close(); 
-          }
-        });
-      }
-    );
-  });
-}
+// Inicializa o servidor
+const start = async () => {
+  try {
+    const PORT = process.env.PORT || 3000;
+    await fastify.listen({ port: PORT });
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
 
-quickStart();
+start();
